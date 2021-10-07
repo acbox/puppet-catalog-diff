@@ -20,6 +20,11 @@ Puppet::Face.define(:catalog, '0.0.1') do
       summary 'Get catalog from PuppetDB instead of compile master'
     end
 
+    option '--maximum_age HOURS' do
+      summary 'Maximum age in hours of catalogs to fetch from PuppetDB, default 8760'
+      default_to { 8760 }
+    end
+
     description <<-'EOT'
       This action is used to seed a series of catalogs to then be compared with diff
     EOT
@@ -52,6 +57,9 @@ Puppet::Face.define(:catalog, '0.0.1') do
         Puppet.debug("Directory did not exist, creating #{save_directory}")
         FileUtils.mkdir(save_directory)
       end
+      if options[:maximum_age] and !options[:catalog_from_puppetdb]
+        raise "Option --maximum_age requires --catalog_from_puppetdb"
+      end
       thread_count = 10
       compiled_nodes = []
       failed_nodes = {}
@@ -65,7 +73,8 @@ Puppet::Face.define(:catalog, '0.0.1') do
                 node_name, save_directory,
                 options[:master_server],
                 options[:certless],
-                options[:catalog_from_puppetdb]
+                options[:catalog_from_puppetdb],
+                options[:maximum_age]
               )
               mutex.synchronize { compiled_nodes << node_name }
             rescue Exception => e

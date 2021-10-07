@@ -11,10 +11,10 @@ module Puppet::CatalogDiff
 
     attr_reader :node_name
 
-    def initialize(node_name, save_directory, server, certless, catalog_from_puppetdb)
+    def initialize(node_name, save_directory, server, certless, catalog_from_puppetdb, maximum_age)
       @node_name = node_name
       catalog = if catalog_from_puppetdb
-                  get_catalog_from_puppetdb(node_name, server)
+                  get_catalog_from_puppetdb(node_name, server, maximum_age)
                 else
                   catalog = compile_catalog(node_name, server, certless)
                   clean_sensitive_parameters!(catalog)
@@ -45,14 +45,15 @@ module Puppet::CatalogDiff
       node.environment
     end
 
-    def get_catalog_from_puppetdb(node_name, server)
+    def get_catalog_from_puppetdb(node_name, server, maximum_age)
       Puppet.debug("Getting PuppetDB catalog for #{node_name}")
       require 'puppet/util/puppetdb'
       server_url = Puppet::Util::Puppetdb.config.server_urls[0]
       port = server_url.port
       use_ssl = port != 8080
       connection = Puppet::Network::HttpPool.http_instance(server_url.host, port, use_ssl)
-      query = ['and', ['=', 'certname', node_name.to_s]]
+      maximum_age = Time.now - (maximum_age * 60 * 60)
+      query = ['and', ['=', 'certname', node_name.to_s]['>=', 'producer_timestamp', maximum_age]]
       _server, environment = server.split('/')
       environment ||= lookup_environment(node_name)
       query.concat([['=', 'environment', environment]])
